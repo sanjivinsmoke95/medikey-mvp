@@ -18,10 +18,13 @@
   "dependencies": {
     "@medikey/config": "workspace:*",
     "@medikey/core": "workspace:*",
+    "pg": "^8.13.0",
+    "redis": "^4.7.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
+    "@types/pg": "^8.11.0",
     "typescript": "^5.9.3"
   }
 }

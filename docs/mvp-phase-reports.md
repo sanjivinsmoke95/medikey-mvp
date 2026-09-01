@@ -303,3 +303,41 @@ fields. Implementation notes below apply to the whole build.
 - **Architectural deviations:** none. The frozen scanner remains SSR/minimal-JS; the owner console is
   an operator UI over the API, explicitly not the eventual PWA.
 - **How to run:** `pnpm dev` (or `PORT=8788 bash scripts/dev.sh`) → `http://localhost:8788`.
+
+---
+
+## P12 — Postgres/Redis/KMS adapters (post-review, on instruction)
+- **Tasks completed:** the deferred **"Postgres/Redis/cloud-KMS adapters"** build, behind the frozen
+  ports (no service-layer changes). `PostgresRepository` (full `Repository`), `PgAuditSink`
+  (append-only `security_events`), and a persistent `PgKeyProvider` — the KMS stand-in: each subject
+  key is stored WRAPPED under `MASTER_KEY` in a new `subject_keys` table (M08), so the DB alone holds
+  no usable key; crypto-shred is a tombstone (wrapped key nulled + `destroyed_at`) that blocks key
+  re-creation (restore-no-resurrect). `RedisCache` + `RedisRateLimiter` (sliding-window sorted set)
+  back the view cache and abuse limits. `createServerContext`/`createServerApp` select adapters from
+  `DATABASE_URL`/`REDIS_URL` (dynamic imports, so the in-memory path never needs pg/redis); the two
+  can be mixed. Migration runner `scripts/migrate.mjs`.
+- **Verified against real servers (docker-compose Postgres 16 + Redis 7):** the full DoD flow runs
+  through the Postgres+Redis-backed app (L1-only scan, break-glass L2 never L3, single-use); **data
+  persists across a fresh connection**; **sensitive columns are ciphertext at rest** (raw
+  `full_name_enc` contains no plaintext); **crypto-shred leaves the key unrecoverable with no
+  resurrection** and revokes sessions. Also verified the running HTTP server boots `store: postgres,
+  cache: redis` and serves the same flow. Full suite **101/101** with the DB env; **98 pass + 3
+  skip** without it (adapter tests gate on `DATABASE_URL`, so CI stays DB-free).
+- **Security checks:** field-level ciphertext at rest confirmed on real rows; no bulk-decrypt/export
+  surface added; append-only audit sink (INSERT/SELECT only); parameterized SQL throughout;
+  crypto-shred tombstone verified. Invariants unchanged — adapters carry no policy.
+- **Files/modules changed:** `services/api/src/adapters/{postgres,redis,postgres.test}.ts`;
+  `services/api/src/app/{context,assemble}.ts` (+`createServerContext`/`createServerApp`);
+  `services/api/src/index.ts`; `services/api/src/http/main.ts` (boots the env-driven app);
+  `db/migrations/0008_subject_keys.sql`; `scripts/migrate.mjs`; `services/api/package.json`
+  (pg, redis); `README.md` (persistent mode).
+- **Database changes:** M08 (subject_keys — persistent KeyProvider backing). M01–M07 unchanged.
+- **Known issues:** `PgKeyProvider.hasSubjectKey` is a best-effort in-process cache (the port method
+  is synchronous; it is test-only, not on any runtime path). Production would use a managed KMS/HSM
+  rather than `subject_keys` + `MASTER_KEY`.
+- **Deferred work (unchanged):** rich Next.js PWA; production auth provider; break-glass
+  live-approval path; managed cloud KMS wiring; Terraform apply in staging.
+- **Architectural deviations:** none. The frozen Postgres/Redis/KMS choice is realised behind the
+  existing ports; `subject_keys` is the local persistent stand-in for the managed KMS.
+- **How to run:** see README "Persistent mode" — `docker compose up`, `node scripts/migrate.mjs`,
+  then `pnpm dev` with `DATABASE_URL`/`REDIS_URL`/`MASTER_KEY` set.

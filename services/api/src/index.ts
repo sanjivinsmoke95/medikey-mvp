@@ -14,8 +14,9 @@ export {
 } from "./adapters/memory";
 
 export * from "./app/errors";
-export { createContext, createTestContext, type AppContext } from "./app/context";
-export { assembleApp, createApp, createTestApp, type App } from "./app/assemble";
+export { createContext, createTestContext, createServerContext, type AppContext } from "./app/context";
+export { assembleApp, createApp, createTestApp, createServerApp, type App } from "./app/assemble";
+export { createHttpServer, buildRouter } from "./http/server";
 
 export { AuthService } from "./auth/service";
 export { DevAuthProvider } from "./auth/provider";

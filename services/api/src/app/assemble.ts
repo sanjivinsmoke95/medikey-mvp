@@ -1,4 +1,4 @@
-import { createContext, createTestContext, type AppContext } from "./context";
+import { createContext, createTestContext, createServerContext, type AppContext } from "./context";
 import { AuthService } from "../auth/service";
 import { ProfileService } from "../profile/service";
 import { MedicalService } from "../medical/service";
@@ -43,4 +43,13 @@ export function createApp(source: Record<string, string | undefined> = process.e
 
 export function createTestApp(): App {
   return assembleApp(createTestContext());
+}
+
+/**
+ * Environment-driven composition root: uses Postgres/Redis adapters when
+ * DATABASE_URL/REDIS_URL are set, otherwise the in-memory adapters. This is the
+ * entrypoint the HTTP server boots from.
+ */
+export async function createServerApp(source: Record<string, string | undefined> = process.env): Promise<App> {
+  return assembleApp(await createServerContext(source));
 }

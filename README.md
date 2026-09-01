@@ -51,9 +51,37 @@ PORT=8788 bash scripts/dev.sh
 - Scanner emergency page: `http://localhost:8788/e/<opaque-id>` (the opaque id
   is shown once when you generate a code).
 
-Data lives in memory and resets on restart. The Postgres/Redis/KMS adapters and
-a rich PWA remain the documented next builds; this server accepts either adapter
-set behind the same ports.
+Data lives in memory and resets on restart (see persistent mode below). A rich
+Next.js PWA remains the documented next build; this server is the operator UI.
+
+## Persistent mode (Postgres + Redis)
+
+Real adapters sit behind the same ports and are selected by environment:
+`DATABASE_URL` → Postgres (repository, append-only audit sink, and a persistent
+KeyProvider that wraps each subject key under `MASTER_KEY`); `REDIS_URL` → Redis
+(view cache + rate limiter). Set neither and it stays in-memory; the two can be
+mixed. Sensitive fields are ciphertext at rest; crypto-shred on deletion is a
+tombstone (no resurrection).
+
+```bash
+docker compose -f docker-compose.dev.yml up -d       # Postgres + Redis (synthetic data only)
+
+export DATABASE_URL="postgres://medikey:medikey_local_dev@127.0.0.1:5432/medikey_dev"
+export REDIS_URL="redis://127.0.0.1:6379"
+export MASTER_KEY="$(head -c32 /dev/urandom | base64)"   # 32-byte KEK; keep it stable to keep data readable
+export IDENTIFIER_PEPPER="$(head -c32 /dev/urandom | base64)"
+
+node scripts/migrate.mjs        # apply db/migrations/*.sql  (add --reset to rebuild the schema)
+pnpm dev                        # boots with store: postgres, cache: redis
+```
+
+Adapter integration tests live in `services/api/src/adapters/postgres.test.ts`
+and run only when `DATABASE_URL` is set (the default suite stays DB-free):
+
+```bash
+DATABASE_URL="postgres://medikey:medikey_local_dev@127.0.0.1:5432/medikey_test" \
+REDIS_URL="redis://127.0.0.1:6379" pnpm test
+```
 
 ## Development principles (enforced)
 - **Local-first:** local dev runs without cloud infra (local Postgres/Redis via docker-compose; T003).

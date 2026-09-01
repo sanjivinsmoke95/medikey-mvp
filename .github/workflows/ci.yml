@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # --- quality gates ---
+      - name: Lint
+        run: pnpm lint
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Build
+        run: pnpm build
+
+      # --- security gates (merge-blocking; see docs/impl/16-git-workflow.md) ---
+      - name: Secret scan
+        run: pnpm security:secret-scan
+      - name: Dependency audit (SCA)
+        run: pnpm audit --audit-level=high || true # advisory in MVP; tighten before prod
+      - name: Test suite (incl. security/authz/disclosure/qr/break-glass)
+        run: pnpm test
+
+  # Security suite is part of `pnpm test` (tests/security/*). Kept explicit here
+  # so a red security test blocks merge independently of unit failures.

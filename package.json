@@ -1,0 +1,24 @@
+{
+  "name": "medikey",
+  "private": true,
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "bash scripts/dev.sh",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "security:secret-scan": "node scripts/secret-scan.mjs",
+    "clean": "turbo run clean"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "turbo": "^2.5.8",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.9"
+  }
+}

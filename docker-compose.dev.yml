@@ -1,0 +1,33 @@
+# Local-first development stack (T003, adjustment 1).
+# Brings up local PostgreSQL + Redis so the app runs WITHOUT any cloud infra.
+# Data here is SYNTHETIC only. Production uses managed, India-region services
+# provisioned by Terraform (infra/) — never this file.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: medikey
+      POSTGRES_PASSWORD: medikey_local_dev # local-only, non-secret, synthetic env
+      POSTGRES_DB: medikey_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - medikey_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U medikey"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  medikey_pg:

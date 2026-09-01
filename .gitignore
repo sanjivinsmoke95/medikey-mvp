@@ -1,0 +1,20 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+.dev/
+.turbo/
+*.tsbuildinfo
+
+# test / coverage
+coverage/
+
+# secrets & env — NEVER commit (frozen invariant: no secrets in repo)
+.env
+.env.*
+!.env.example
+
+# misc
+*.log
+.DS_Store

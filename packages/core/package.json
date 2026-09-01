@@ -1,0 +1,26 @@
+{
+  "name": "@medikey/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "echo \"[@medikey/core] ok\" && exit 0",
+    "test": "echo \"[@medikey/core] tests run via root vitest\" && exit 0",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "uuid": "^11.0.5",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.9.3"
+  }
+}

@@ -5,6 +5,7 @@ import { createApp, type App } from "../app/assemble";
 import { AppError, AuthError } from "../app/errors";
 import { renderEmergencyPage } from "../emergency/render";
 import { OWNER_UI_HTML } from "./owner-ui";
+import { SITE_HTML } from "./site";
 
 /**
  * HTTP layer (P11) — wires the frozen service layer behind a zero-dependency
@@ -264,8 +265,9 @@ export function buildRouter(app: App) {
     json(res, 200, { ok: true });
   });
 
-  // ---- Owner console (single static page) ----
-  add("GET", "/", "none", ({ res }) => html(res, 200, OWNER_UI_HTML));
+  // ---- Public site + owner console (static pages) ----
+  add("GET", "/", "none", ({ res }) => html(res, 200, SITE_HTML));           // full marketing website
+  add("GET", "/console", "none", ({ res }) => html(res, 200, OWNER_UI_HTML)); // functional owner console
   add("GET", "/health", "none", ({ res }) => json(res, 200, { ok: true }));
 
   function match(method: string, path: string): { route: Route; params: Record<string, string> } | undefined {

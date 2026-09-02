@@ -62,8 +62,10 @@ iframe.preview{width:100%;height:420px;border:1px solid var(--line);border-radiu
 </head>
 <body>
 <header>
-  <div class="logo">M</div>
-  <h1>MediKey — Owner Console</h1>
+  <a href="/" style="text-decoration:none;color:inherit;display:flex;align-items:center;gap:12px" title="Back to medikey.site">
+    <div class="logo">M</div>
+    <h1>MediKey — Owner Console</h1>
+  </a>
   <div class="who" id="who">not signed in</div>
 </header>
 <main>

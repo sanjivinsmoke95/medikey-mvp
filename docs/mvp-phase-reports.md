@@ -382,3 +382,43 @@ fields. Implementation notes below apply to the whole build.
   secret port is retained for dev/recovery.
 - **How to run:** `pnpm dev`, open `/console`, "Add a passkey" while signed in, then "Sign in with
   passkey" / "Step-up with passkey". Set `RP_ID`/`RP_ORIGIN` for a non-localhost origin.
+
+---
+
+## P14 — Owner UX redesign + QR image + personal details / documents (on instruction)
+- **Tasks completed:** an information-architecture + UX simplification of the owner console (the admin
+  panel became a calm health-identity app) plus the concrete asks. New IA at `/console`: **Home**
+  (identity/emergency card + info summary + recent activity), **My Profile** (basic/contact/emergency
+  personal details), **Medical** (allergies/conditions/medications/history/documents, progressive
+  disclosure), **Sharing** (generate QR, active access, simple "Emergency/Extended/Private" chooser
+  over the disclosure tiers), **Activity** (humanized access history), **Settings** (account,
+  passkeys, export, delete). Step-up is hidden behind a "Confirm it's you" modal; destructive actions
+  use confirmation flows; empty states everywhere; responsive sidebar → bottom-nav.
+- **Concrete features:** (1) **Generate now renders a scannable QR inline** — the server produces an
+  SVG QR (via `qrcode`) encoding the REAL reachable scan URL (`originOf(req)/e/<opaque>`), so a phone
+  camera opens the emergency page; verified the encoded URL returns L1 info (name, age,
+  life-threatening allergy, tap-to-call contact, blood group). (2) **Personal details** the model
+  lacked (gender, phone, address, photo) via one encrypted `extras` JSON field on the subject +
+  DOB now editable/returned. (3) **Documents / X-rays** via a new `document` medical type (image held
+  inside the item's encrypted payload; L3-class, never scanner-reachable).
+- **Verified:** 4 new backend tests (extras persist + DOB, partial-merge update, `document` accepted /
+  unknown rejected, extras encrypted-at-rest). Live: full owner flow in the browser (Home identity
+  card, Sharing QR render, Medical sections), QR scan URL returns emergency info. Full suite **107 pass
+  + 3 skip / 111 with the DB env**. Fixed a step-up modal bug (on-close callback resolved the promise
+  `false` before success `resolve(true)`).
+- **Security checks:** no authority added to the UI — step-up/ownership/disclosure/audit still enforced
+  server-side; extras + document images are field-level encrypted (ciphertext at rest confirmed);
+  documents are L3 (never on a scan); access history stays anonymous (activity is presented honestly,
+  no fabricated actor names).
+- **Files/modules changed:** `services/api/src/http/{owner-ui,server}.ts` (redesign + QR image +
+  `originOf`); `services/api/src/domain/model.ts` (+`document`, +`extrasEnc`);
+  `services/api/src/profile/{service,extras.test}.ts` (extras/DOB); `services/api/src/medical/service.ts`
+  + `services/api/src/disclosure/service.ts` (document type/section/display);
+  `services/api/src/adapters/postgres.ts` (extras_enc mapping); `db/migrations/0009_owner_ux.sql`;
+  `services/api/package.json` (`qrcode`).
+- **Database changes:** M09 (subject_profiles.extras_enc; medical_items type CHECK += 'document').
+- **Known issues / deferred:** single-subject owner view (dependents UI still deferred); a phone can
+  only open the QR when the server is reachable from it (LAN IP or deployed, not localhost); the
+  "active access" list refreshes on page revisit, not instantly after generate.
+- **Architectural deviations:** none. The disclosure engine, tiers, encryption and audit are unchanged;
+  documents fit the frozen L3 semantics.

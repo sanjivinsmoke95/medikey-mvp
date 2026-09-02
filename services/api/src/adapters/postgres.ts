@@ -116,11 +116,11 @@ export class PostgresRepository implements Repository {
   async createSubject(s: SubjectProfile): Promise<void> {
     await this.q(
       `INSERT INTO subject_profiles (id,account_id,relationship,full_name_enc,dob_enc,age_years,preferred_language,
-         emergency_instructions_enc,last_reviewed_at,last_confirmed_at,created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+         emergency_instructions_enc,extras_enc,last_reviewed_at,last_confirmed_at,created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
       [s.id, s.accountId, s.relationship, encField(s.fullNameEnc), encField(s.dobEnc), s.ageYears ?? null,
-       s.preferredLanguage ?? null, encField(s.emergencyInstructionsEnc), s.lastReviewedAt ?? null,
-       s.lastConfirmedAt ?? null, s.createdAt],
+       s.preferredLanguage ?? null, encField(s.emergencyInstructionsEnc), encField(s.extrasEnc),
+       s.lastReviewedAt ?? null, s.lastConfirmedAt ?? null, s.createdAt],
     );
   }
   async getSubject(id: string) { return mapSubject(await this.one(`SELECT * FROM subject_profiles WHERE id=$1`, [id])); }
@@ -130,9 +130,10 @@ export class PostgresRepository implements Repository {
   async updateSubject(s: SubjectProfile): Promise<void> {
     await this.q(
       `UPDATE subject_profiles SET relationship=$2,full_name_enc=$3,dob_enc=$4,age_years=$5,preferred_language=$6,
-        emergency_instructions_enc=$7,last_reviewed_at=$8,last_confirmed_at=$9,updated_at=now() WHERE id=$1`,
+        emergency_instructions_enc=$7,extras_enc=$8,last_reviewed_at=$9,last_confirmed_at=$10,updated_at=now() WHERE id=$1`,
       [s.id, s.relationship, encField(s.fullNameEnc), encField(s.dobEnc), s.ageYears ?? null,
-       s.preferredLanguage ?? null, encField(s.emergencyInstructionsEnc), s.lastReviewedAt ?? null, s.lastConfirmedAt ?? null],
+       s.preferredLanguage ?? null, encField(s.emergencyInstructionsEnc), encField(s.extrasEnc),
+       s.lastReviewedAt ?? null, s.lastConfirmedAt ?? null],
     );
   }
   async deleteSubject(id: string): Promise<void> { await this.q(`DELETE FROM subject_profiles WHERE id=$1`, [id]); }
@@ -374,6 +375,7 @@ function mapSubject(r?: Row): SubjectProfile | undefined {
     id: r.id, accountId: r.account_id, relationship: r.relationship as SubjectRelationship,
     fullNameEnc: decField(r.full_name_enc)!, dobEnc: decField(r.dob_enc), ageYears: r.age_years ?? undefined,
     preferredLanguage: r.preferred_language ?? undefined, emergencyInstructionsEnc: decField(r.emergency_instructions_enc),
+    extrasEnc: decField(r.extras_enc),
     lastReviewedAt: iso(r.last_reviewed_at), lastConfirmedAt: iso(r.last_confirmed_at), createdAt: isoReq(r.created_at),
   };
 }

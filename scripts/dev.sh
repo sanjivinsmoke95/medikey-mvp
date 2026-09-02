@@ -3,10 +3,11 @@
 # Bundles the API from source with esbuild (workspace aliases → src entrypoints)
 # and runs it on Node. Local adapters only — no cloud, no DB.
 #
-# Needs the declared runtime deps resolvable (zod, uuid). With pnpm:
+# Needs the declared runtime deps resolvable. With pnpm:
 #   pnpm install
-# Without pnpm (zero-config), just the two runtime deps are enough:
-#   npm install --no-save --no-package-lock zod uuid
+# Without pnpm (zero-config):
+#   npm install --no-save --no-package-lock zod uuid @simplewebauthn/server qrcode
+#   # add: pg redis   (only for persistent mode)
 #
 #   PORT=8788 scripts/dev.sh
 set -euo pipefail

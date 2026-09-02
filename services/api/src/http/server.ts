@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import QRCode from "qrcode";
 import type { Principal } from "@medikey/core";
 import { AuthzError } from "@medikey/core";
 import { createApp, type App } from "../app/assemble";
@@ -50,6 +51,16 @@ function json(res: ServerResponse, status: number, payload: unknown): void {
 function html(res: ServerResponse, status: number, body: string): void {
   res.writeHead(status, { "content-type": "text/html; charset=utf-8" });
   res.end(body);
+}
+
+/** This server's externally-reachable origin, from proxy headers or Host. */
+function originOf(req: IncomingMessage): string {
+  const fwdProto = (req.headers["x-forwarded-proto"] as string | undefined)?.split(",")[0]?.trim();
+  const proto = fwdProto || ((req.socket as { encrypted?: boolean }).encrypted ? "https" : "http");
+  const host = (req.headers["x-forwarded-host"] as string | undefined)
+    || (req.headers.host as string | undefined)
+    || "localhost:8788";
+  return `${proto}://${host}`;
 }
 
 /** Coarse network region only — first two octets, never a precise IP (G6). */
@@ -174,12 +185,14 @@ export function buildRouter(app: App) {
       dateOfBirth?: string;
       preferredLanguage?: string;
       relationship?: string;
+      extras?: Record<string, unknown>;
     };
     const out = await app.profile.createSubject(principal!, {
       fullName: String(b.fullName ?? ""),
       dateOfBirth: b.dateOfBirth,
       preferredLanguage: b.preferredLanguage,
       relationship: b.relationship as never,
+      extras: b.extras as never,
     });
     json(res, 201, out);
   });
@@ -189,8 +202,11 @@ export function buildRouter(app: App) {
   });
 
   add("PATCH", "/api/subjects/:id", "stepup", async ({ res, principal, params, body }) => {
-    const b = (body ?? {}) as { fullName?: string; emergencyInstructions?: string; confirm?: boolean };
-    await app.profile.updateIdentity(principal!, params.id!, b);
+    const b = (body ?? {}) as {
+      fullName?: string; dateOfBirth?: string; emergencyInstructions?: string;
+      extras?: Record<string, unknown>; confirm?: boolean;
+    };
+    await app.profile.updateIdentity(principal!, params.id!, b as never);
     json(res, 200, { ok: true });
   });
 
@@ -255,10 +271,17 @@ export function buildRouter(app: App) {
     json(res, 200, await app.qr.listQr(principal!, params.id!));
   });
 
-  add("POST", "/api/subjects/:id/qr", "stepup", async ({ res, principal, params, body }) => {
+  add("POST", "/api/subjects/:id/qr", "stepup", async ({ res, principal, params, body, req }) => {
     const b = (body ?? {}) as { label?: string };
     const out = await app.qr.createQr(principal!, params.id!, String(b.label ?? "wallet"));
-    json(res, 201, out);
+    // Encode the REAL reachable scan URL (this server's origin) so a phone camera
+    // opens the emergency page directly. Render it as an inline SVG QR.
+    const scanUrl = `${originOf(req)}/e/${out.opaqueId}`;
+    const qrSvg = await QRCode.toString(scanUrl, {
+      type: "svg", margin: 1, errorCorrectionLevel: "M",
+      color: { dark: "#0f2a5c", light: "#ffffff" },
+    });
+    json(res, 201, { ...out, scanUrl, qrSvg });
   });
 
   add("POST", "/api/qr/:qrId/revoke", "stepup", async ({ res, principal, params }) => {

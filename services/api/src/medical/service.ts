@@ -25,7 +25,7 @@ export interface MedicalItemView {
 
 const ITEM_TYPES = new Set<MedicalItemType>([
   "blood_group", "allergy", "condition", "medication", "medication_avoidance",
-  "implant", "surgery", "injury", "emergency_contact",
+  "implant", "surgery", "injury", "emergency_contact", "document",
 ]);
 
 /**

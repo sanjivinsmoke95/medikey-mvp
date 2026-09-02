@@ -31,6 +31,7 @@ const SECTION_BY_TYPE: Record<MedicalItemType, EmergencySection> = {
   surgery: "surgery",
   injury: "injury",
   emergency_contact: "contact",
+  document: "document", // L3-class (never scanner-reachable)
 };
 
 const LABEL: Record<EmergencySection, string> = {
@@ -205,6 +206,8 @@ export class DisclosureService {
         return data.dose ? `${name} (${data.dose as string})` : name;
       case "allergy":
         return data.reaction ? `${name} — ${data.reaction as string}` : name;
+      case "document":
+        return String(data.title ?? data.name ?? "Document");
       default:
         return name;
     }

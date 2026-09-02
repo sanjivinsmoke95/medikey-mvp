@@ -58,6 +58,8 @@ export interface SubjectProfile {
   ageYears?: number; // derived, non-identifying; safe for L1
   preferredLanguage?: string;
   emergencyInstructionsEnc?: EncryptedField;
+  /** 🔒 encrypted JSON of extended personal details {gender, phone, address, photo}. */
+  extrasEnc?: EncryptedField;
   lastReviewedAt?: string;
   lastConfirmedAt?: string;
   createdAt: string;
@@ -72,7 +74,8 @@ export type MedicalItemType =
   | "implant"
   | "surgery"
   | "injury"
-  | "emergency_contact";
+  | "emergency_contact"
+  | "document"; // X-rays / reports — image stored inside the encrypted data payload (L3-class)
 
 export interface MedicalItem {
   id: string;

@@ -84,6 +84,18 @@ iframe.preview{width:100%;height:420px;border:1px solid var(--line);border-radiu
     <button id="btnStepup" class="green" disabled>Step-up (re-enter passphrase)</button>
     <button id="btnLogout" class="ghost" disabled>Sign out</button>
   </div>
+  <div style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--line)">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <span class="pill step">🔑 Passkeys (WebAuthn)</span>
+      <span class="muted" style="font-size:12.5px">Production auth — public-key, no shared secret.</span>
+    </div>
+    <div class="row">
+      <button id="btnPasskeyLogin" class="ghost">Sign in with passkey</button>
+      <button id="btnPasskeyAdd" class="ghost" disabled>Add a passkey</button>
+      <div style="flex:1"></div>
+      <button id="btnPasskeyStepup" class="green" disabled>Step-up with passkey</button>
+    </div>
+  </div>
   <p class="muted" id="authState" style="margin:12px 0 0">Sensitive actions (disclosure, QR, delete) require step-up.</p>
 </section>
 
@@ -196,6 +208,8 @@ function setAuthUI(){
   const needStep = ['btnSaveSelections','btnCreateQr','btnExport','btnDeleteSubject'];
   needStep.forEach(id=>{ const el=$(id); if(el) el.disabled = !S.stepped || !S.subjectId && id!=='btnExport'; });
   $('btnExport').disabled = !S.stepped;
+  $('btnPasskeyAdd').disabled = !S.token;
+  $('btnPasskeyStepup').disabled = !S.token || S.stepped;
   $('authState').textContent = S.stepped ? 'Stepped-up — sensitive actions unlocked.' : 'Sensitive actions (disclosure, QR, delete) require step-up.';
 }
 
@@ -204,6 +218,38 @@ $('btnRegister').onclick = async()=>{ try{ await api('POST','/api/auth/register'
 $('btnLogin').onclick = async()=>{ try{ const r=await api('POST','/api/auth/login',{email:$('email').value,secret:$('secret').value}); S.token=r.token; S.accountId=r.accountId; S.stepped=false; setAuthUI(); await loadSubjects(); toast('Signed in'); }catch(e){ toast(e.message,true);} };
 $('btnStepup').onclick = async()=>{ try{ const r=await api('POST','/api/auth/stepup',{secret:$('secret').value}); S.token=r.token; S.stepped=true; setAuthUI(); toast('Stepped up'); }catch(e){ toast(e.message,true);} };
 $('btnLogout').onclick = ()=>{ Object.assign(S,{token:null,stepped:false,accountId:null,subjectId:null,items:[],subjects:[]}); setAuthUI(); toast('Signed out'); };
+
+// ---- Passkeys (WebAuthn) ----
+function wa(){ return window.PublicKeyCredential && PublicKeyCredential.parseCreationOptionsFromJSON && PublicKeyCredential.parseRequestOptionsFromJSON; }
+$('btnPasskeyAdd').onclick = async()=>{
+  if(!wa()) return toast('This browser lacks WebAuthn JSON support',true);
+  try{
+    const optionsJSON = await api('POST','/api/auth/passkey/register/options',{});
+    const cred = await navigator.credentials.create({ publicKey: PublicKeyCredential.parseCreationOptionsFromJSON(optionsJSON) });
+    await api('POST','/api/auth/passkey/register/verify', cred.toJSON());
+    toast('Passkey registered ✓');
+  }catch(e){ toast(e.message||'passkey cancelled',true); }
+};
+$('btnPasskeyLogin').onclick = async()=>{
+  if(!wa()) return toast('This browser lacks WebAuthn JSON support',true);
+  const email=$('email').value;
+  try{
+    const optionsJSON = await api('POST','/api/auth/passkey/login/options',{email});
+    const cred = await navigator.credentials.get({ publicKey: PublicKeyCredential.parseRequestOptionsFromJSON(optionsJSON) });
+    const r = await api('POST','/api/auth/passkey/login/verify', { email, response: cred.toJSON() });
+    S.token=r.token; S.accountId=r.accountId; S.stepped=false; setAuthUI(); await loadSubjects(); toast('Signed in with passkey');
+  }catch(e){ toast(e.message||'passkey cancelled',true); }
+};
+$('btnPasskeyStepup').onclick = async()=>{
+  if(!wa()) return toast('This browser lacks WebAuthn JSON support',true);
+  const email=$('email').value;
+  try{
+    const optionsJSON = await api('POST','/api/auth/passkey/login/options',{email});
+    const cred = await navigator.credentials.get({ publicKey: PublicKeyCredential.parseRequestOptionsFromJSON(optionsJSON) });
+    const r = await api('POST','/api/auth/passkey/stepup/verify', { email, response: cred.toJSON() });
+    S.token=r.token; S.stepped=true; setAuthUI(); toast('Stepped up with passkey');
+  }catch(e){ toast(e.message||'passkey cancelled',true); }
+};
 
 // ---- Subjects ----
 async function loadSubjects(){

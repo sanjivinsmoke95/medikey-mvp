@@ -143,6 +143,26 @@ export function buildRouter(app: App) {
     json(res, 200, { accountId: principal!.accountId, authStrength: principal!.authStrength });
   });
 
+  // ---- Passkeys (WebAuthn) — production auth ----
+  add("POST", "/api/auth/passkey/register/options", "primary", async ({ res, req }) => {
+    json(res, 200, await app.auth.passkeyRegisterOptions(bearer(req)!));
+  });
+  add("POST", "/api/auth/passkey/register/verify", "primary", async ({ res, req, body }) => {
+    json(res, 200, await app.auth.passkeyRegisterVerify(bearer(req)!, body as never));
+  });
+  add("POST", "/api/auth/passkey/login/options", "none", async ({ res, body }) => {
+    const b = (body ?? {}) as { email?: string };
+    json(res, 200, await app.auth.passkeyLoginOptions(String(b.email ?? "")));
+  });
+  add("POST", "/api/auth/passkey/login/verify", "none", async ({ res, body }) => {
+    const b = (body ?? {}) as { email?: string; response?: unknown };
+    json(res, 200, await app.auth.passkeyLoginVerify(String(b.email ?? ""), b.response as never));
+  });
+  add("POST", "/api/auth/passkey/stepup/verify", "primary", async ({ res, req, body }) => {
+    const b = (body ?? {}) as { email?: string; response?: unknown };
+    json(res, 200, await app.auth.passkeyStepUp(bearer(req)!, String(b.email ?? ""), b.response as never));
+  });
+
   // ---- Profile ----
   add("GET", "/api/subjects", "primary", async ({ res, principal }) => {
     json(res, 200, await app.profile.listSubjects(principal!));

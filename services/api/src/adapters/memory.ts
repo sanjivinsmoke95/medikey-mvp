@@ -44,6 +44,10 @@ export class MemoryRepository implements Repository {
       if (c.accountId === accountId && c.type === type) return clone(c);
     return undefined;
   }
+  async listCredentialsByAccountAndType(accountId: string, type: Credential["type"]) {
+    return [...this.credentials.values()].filter((c) => c.accountId === accountId && c.type === type).map(clone);
+  }
+  async updateCredential(c: Credential) { this.credentials.set(c.id, clone(c)); }
 
   async createSession(s: Session) { this.sessions.set(s.id, clone(s)); }
   async getSessionByTokenHash(tokenHash: string) {

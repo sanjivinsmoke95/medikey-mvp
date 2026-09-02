@@ -29,6 +29,8 @@ export interface Repository {
   // credentials
   addCredential(c: Credential): Promise<void>;
   getCredentialByAccountAndType(accountId: string, type: Credential["type"]): Promise<Credential | undefined>;
+  listCredentialsByAccountAndType(accountId: string, type: Credential["type"]): Promise<Credential[]>;
+  updateCredential(c: Credential): Promise<void>;
 
   // sessions
   createSession(s: Session): Promise<void>;

@@ -18,6 +18,7 @@
   "dependencies": {
     "@medikey/config": "workspace:*",
     "@medikey/core": "workspace:*",
+    "@simplewebauthn/server": "^13.1.0",
     "pg": "^8.13.0",
     "redis": "^4.7.0",
     "zod": "^3.25.76"

@@ -46,8 +46,13 @@ npm install --no-save --no-package-lock zod uuid
 PORT=8788 bash scripts/dev.sh
 ```
 
-- Owner console: `http://localhost:8788/` — register, sign in, step-up, add
-  medical items, set disclosure levels, preview, generate/revoke QR codes.
+- Public website: `http://localhost:8788/`.
+- Owner console: `http://localhost:8788/console` — register, sign in (dev secret
+  **or a passkey**), step-up, add medical items, set disclosure levels, preview,
+  generate/revoke QR codes.
+- Passkeys (WebAuthn): sign in / step-up with a platform authenticator or
+  security key. Set `RP_ID` / `RP_ORIGIN` for a non-localhost origin (they
+  default to `localhost` / `http://localhost:8788`).
 - Scanner emergency page: `http://localhost:8788/e/<opaque-id>` (the opaque id
   is shown once when you generate a code).
 

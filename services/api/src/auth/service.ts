@@ -2,6 +2,11 @@ import { newId, hmacHex, randomToken, type Principal } from "@medikey/core";
 import type { AppContext } from "../app/context";
 import { AuthError, ConflictError, RateLimitError, ValidationError } from "../app/errors";
 import type { Account, Session } from "../domain/model";
+import { PasskeyService } from "./passkey";
+import type {
+  RegistrationResponseJSON,
+  AuthenticationResponseJSON,
+} from "@simplewebauthn/server";
 
 const NOTICE_VERSION = "2026-08-31";
 
@@ -19,7 +24,10 @@ export interface SessionResult {
 }
 
 export class AuthService {
-  constructor(private readonly ctx: AppContext) {}
+  private readonly passkeys: PasskeyService;
+  constructor(private readonly ctx: AppContext) {
+    this.passkeys = new PasskeyService(ctx);
+  }
 
   private hashToken(token: string): string {
     return hmacHex(this.ctx.pepper, token);
@@ -142,5 +150,52 @@ export class AuthService {
     if (!stored || stored !== this.hashToken(code)) throw new AuthError();
     await this.ctx.cache.del(`otpcode:${acc.id}`); // single-use
     return this.issueSession(acc.id, "primary", this.ctx.env.SESSION_TTL_SECONDS);
+  }
+
+  // --- Passkeys (WebAuthn) — the production auth mechanism (ADR-6). ---
+
+  /** Begin passkey enrolment for the signed-in account. */
+  async passkeyRegisterOptions(sessionToken: string) {
+    const principal = await this.requirePrincipal(sessionToken);
+    const acc = await this.ctx.repo.getAccountById(principal.accountId);
+    if (!acc) throw new AuthError();
+    return this.passkeys.registrationOptions(principal, acc.email);
+  }
+
+  /** Finish passkey enrolment: verify the attestation and store the public key. */
+  async passkeyRegisterVerify(sessionToken: string, response: RegistrationResponseJSON) {
+    const principal = await this.requirePrincipal(sessionToken);
+    return this.passkeys.registrationVerify(principal, response);
+  }
+
+  /** Begin a passkey login/step-up ceremony for an email. */
+  async passkeyLoginOptions(email: string) {
+    return this.passkeys.authenticationOptions(email);
+  }
+
+  /** Finish a passkey login: assertion → a PRIMARY session. */
+  async passkeyLoginVerify(email: string, response: AuthenticationResponseJSON): Promise<SessionResult> {
+    const { accountId } = await this.passkeys.authenticationVerify(email, response);
+    const result = await this.issueSession(accountId, "primary", this.ctx.env.SESSION_TTL_SECONDS);
+    await this.ctx.notifier.notifyOwner(accountId, "new_login", "New sign-in to your MediKey account");
+    await this.ctx.audit.append({
+      id: newId(), type: "login", accountId, detail: { method: "passkey" }, severity: "info", createdAt: this.ctx.now(),
+    });
+    return result;
+  }
+
+  /**
+   * Finish a passkey step-up: a user-verified assertion by the SAME account as
+   * the current session → a STEPPED_UP session. Passkeys replace the dev secret
+   * as the step-up factor (OTP still cannot reach stepped_up).
+   */
+  async passkeyStepUp(sessionToken: string, email: string, response: AuthenticationResponseJSON): Promise<SessionResult> {
+    const principal = await this.requirePrincipal(sessionToken);
+    const { accountId, userVerified } = await this.passkeys.authenticationVerify(email, response);
+    if (accountId !== principal.accountId || !userVerified) throw new AuthError();
+    await this.ctx.audit.append({
+      id: newId(), type: "stepup", accountId, detail: { method: "passkey" }, severity: "info", createdAt: this.ctx.now(),
+    });
+    return this.issueSession(accountId, "stepped_up", this.ctx.env.STEPUP_TTL_SECONDS);
   }
 }

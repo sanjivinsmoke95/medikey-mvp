@@ -341,3 +341,44 @@ fields. Implementation notes below apply to the whole build.
   existing ports; `subject_keys` is the local persistent stand-in for the managed KMS.
 - **How to run:** see README "Persistent mode" — `docker compose up`, `node scripts/migrate.mjs`,
   then `pnpm dev` with `DATABASE_URL`/`REDIS_URL`/`MASTER_KEY` set.
+
+---
+
+## P13 — Production passkeys (WebAuthn) (post-review, on instruction)
+- **Tasks completed:** the deferred **production auth** build (ADR-6 "passkeys primary"), replacing the
+  dev-only secret adapter as the real mechanism. Uses the vetted `@simplewebauthn/server` for both
+  ceremonies. `PasskeyService` (`auth/passkey.ts`): registration options/verify + authentication
+  options/verify; MediKey stores only the credential PUBLIC key + signature counter (never a shared
+  secret), in the existing `credentials` table (`type='passkey'`). Challenges live in the Cache port
+  (Redis/in-memory) with a 5-min TTL. `AuthService` gains passkey session methods — `passkeyLogin*`
+  issues a PRIMARY session, `passkeyStepUp` requires a user-verified assertion by the SAME account and
+  issues a STEPPED_UP session (OTP still cannot reach stepped_up). RP is config-driven
+  (`RP_ID`/`RP_ORIGIN`/`RP_NAME`), so the same code runs on localhost and in production. HTTP
+  endpoints under `/api/auth/passkey/*`; the owner console drives the ceremonies with the browser's
+  native `PublicKeyCredential.parse*FromJSON()` + `.toJSON()` (no client library bundled).
+- **Verified:** 6 unit tests (options well-formed + challenge-bound, session required, **no
+  user-enumeration** — unknown email returns identical option shape, bogus/expired assertions
+  rejected). Live HTTP: register/login options return valid WebAuthn options (RP `localhost`, ES256/
+  RS256/EdDSA offered, 43-byte challenge), bogus verify → 401. Console shows the passkey controls; the
+  browser exposes the WebAuthn JSON APIs in a secure context. **Not automatable here:** the actual
+  authenticator ceremony (Touch ID / security key / a DevTools virtual authenticator) needs a real
+  device — the cryptographic round-trip must be exercised on hardware. Full suite **104 pass + 3
+  skip** (DB).
+- **Security checks:** public-key only (no shared secret at rest); uniform failure (no enumeration);
+  signature-counter persisted for clone detection; step-up requires user verification AND same-account
+  binding; challenges single-use + TTL'd; audited (`passkey_registered`, `login`/`stepup` with
+  `method: passkey`).
+- **Files/modules changed:** `services/api/src/auth/{passkey,passkey.test,service}.ts`;
+  `services/api/src/http/{server,owner-ui}.ts`; `services/api/src/adapters/{ports,memory,postgres}.ts`
+  (+`listCredentialsByAccountAndType`, `updateCredential`); `packages/config/src/env.ts`
+  (`RP_ID`/`RP_ORIGIN`/`RP_NAME`); `services/api/package.json` (`@simplewebauthn/server`).
+- **Database changes:** none — passkeys reuse the `credentials` table (`public_key` holds the stored
+  credential JSON; `label` holds the credential id).
+- **Known issues / deferred:** the dev secret remains as an additive factor for the demo; production
+  would drop it and make passkeys the sole primary. Managed-provider / residency verification (doc 18)
+  stays open — it governs where the RP runs, not the protocol. Conditional-UI (autofill) and
+  cross-device sync hints not yet surfaced in the console.
+- **Architectural deviations:** none. Passkeys are the frozen primary mechanism; the AuthProvider
+  secret port is retained for dev/recovery.
+- **How to run:** `pnpm dev`, open `/console`, "Add a passkey" while signed in, then "Sign in with
+  passkey" / "Step-up with passkey". Set `RP_ID`/`RP_ORIGIN` for a non-localhost origin.

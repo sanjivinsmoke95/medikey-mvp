@@ -84,6 +84,14 @@ export class PostgresRepository implements Repository {
     return mapCredential(await this.one(
       `SELECT * FROM credentials WHERE account_id=$1 AND type=$2 ORDER BY created_at DESC LIMIT 1`, [accountId, type]));
   }
+  async listCredentialsByAccountAndType(accountId: string, type: Credential["type"]) {
+    return (await this.q(`SELECT * FROM credentials WHERE account_id=$1 AND type=$2 ORDER BY created_at`, [accountId, type]))
+      .map((r) => mapCredential(r)!);
+  }
+  async updateCredential(c: Credential): Promise<void> {
+    await this.q(`UPDATE credentials SET secret_hash=$2,public_key=$3,label=$4 WHERE id=$1`,
+      [c.id, c.secretHash ?? null, c.publicKey ?? null, c.label ?? null]);
+  }
 
   // ---- sessions ----
   async createSession(s: Session): Promise<void> {

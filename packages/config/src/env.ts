@@ -30,6 +30,13 @@ export const serverEnvSchema = z
     // Pepper for HMAC identifier hashing.
     IDENTIFIER_PEPPER: z.string().optional(),
 
+    // WebAuthn / passkeys (production auth). RP_ID is the registrable domain
+    // (e.g. "medikey.in"); RP_ORIGIN is the full https origin the ceremony runs
+    // on. Defaults are dev-only (localhost) so passkeys work out of the box.
+    RP_ID: z.string().default("localhost"),
+    RP_ORIGIN: z.string().default("http://localhost:8788"),
+    RP_NAME: z.string().default("MediKey"),
+
     // Tunables (config, not constants)
     SESSION_TTL_SECONDS: z.coerce.number().int().positive().default(3600),
     STEPUP_TTL_SECONDS: z.coerce.number().int().positive().default(300),

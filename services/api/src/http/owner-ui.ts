@@ -142,7 +142,7 @@ nav.bottom{display:none}
     <div style="display:flex;align-items:center;gap:11px;margin-bottom:6px"><span class="logo">M</span><b style="font-size:19px">MediKey</b></div>
     <p class="muted" style="margin:0 0 14px">Your secure medical identity.</p>
     <label class="fld">Email</label><input id="email" placeholder="you@example.com" value="asha@example.com">
-    <label class="fld">Passphrase</label><input id="secret" type="password" value="correct horse battery staple">
+    <label class="fld">Passphrase <span class="faint">— any length, e.g. a short PIN</span></label><input id="secret" type="password" value="1234">
     <button id="btnLogin" class="btn block" style="margin-top:16px">Sign in</button>
     <div class="row" style="margin-top:10px">
       <button id="btnPasskeyLogin" class="btn ghost">🔑 Passkey</button>

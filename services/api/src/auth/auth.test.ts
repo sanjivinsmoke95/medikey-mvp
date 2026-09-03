@@ -21,10 +21,11 @@ describe("AuthService (P2)", () => {
     expect(p?.accountId).toBeTruthy();
   });
 
-  it("rejects duplicate email and weak secret", async () => {
+  it("rejects duplicate email and an empty passphrase (short is allowed)", async () => {
     await auth.register(reg);
     await expect(auth.register(reg)).rejects.toThrow();
-    await expect(auth.register({ email: "x@y.com", secret: "short" })).rejects.toThrow();
+    await expect(auth.register({ email: "x@y.com", secret: "" })).rejects.toThrow(); // empty rejected
+    await expect(auth.register({ email: "z@y.com", secret: "1234" })).resolves.toBeTruthy(); // short is fine
   });
 
   it("login fails uniformly for wrong secret and unknown email", async () => {

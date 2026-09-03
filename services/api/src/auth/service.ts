@@ -55,7 +55,7 @@ export class AuthService {
   async register(input: RegisterInput): Promise<{ accountId: string }> {
     const email = input.email.trim().toLowerCase();
     if (!email.includes("@")) throw new ValidationError("invalid email");
-    if (input.secret.length < 8) throw new ValidationError("secret too short");
+    if (!input.secret) throw new ValidationError("passphrase required");
     if (await this.ctx.repo.getAccountByEmail(email)) throw new ConflictError("email in use");
 
     const account: Account = {

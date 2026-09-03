@@ -5,6 +5,7 @@ import {
   KeyDestroyedError,
   type Ciphertext,
   type EncryptedField,
+  type Provenance,
   encryptWithKey,
   decryptWithKey,
   randomKey,
@@ -12,7 +13,7 @@ import {
 import type {
   Account, Credential, Session, SubjectProfile, MedicalItem, EmergencySelection,
   EmergencyView, QrIdentifier, AccessToken, AccessLog, SecurityEvent, Consent,
-  MedicalItemType, Provenance, AccountStatus, AuthStrength, SubjectRelationship,
+  MedicalItemType, AccountStatus, AuthStrength, SubjectRelationship,
   QrStatus, QrActivationState, GrantType, AccessType, AccessLevel, AccessStatus,
 } from "../domain/model";
 import type { Repository, AuditSink } from "./ports";

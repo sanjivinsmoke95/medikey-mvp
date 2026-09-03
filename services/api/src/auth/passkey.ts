@@ -33,7 +33,9 @@ interface StoredPasskey {
 }
 
 const b64u = (bytes: Uint8Array): string => Buffer.from(bytes).toString("base64url");
-const fromB64u = (s: string): Uint8Array => new Uint8Array(Buffer.from(s, "base64url"));
+// Uint8Array.from copies into a fresh ArrayBuffer-backed array (Uint8Array<ArrayBuffer>),
+// which is what @simplewebauthn's WebAuthnCredential.publicKey expects.
+const fromB64u = (s: string): Uint8Array<ArrayBuffer> => Uint8Array.from(Buffer.from(s, "base64url"));
 
 const CHALLENGE_TTL = 300;
 

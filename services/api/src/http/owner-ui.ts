@@ -186,7 +186,7 @@ nav.bottom{display:none}
 <div class="toast" id="toast"></div>
 
 <script>
-const S = { token:null, stepped:false, email:null, accountId:null, subject:null, items:[], view:'home' };
+const S = { token:null, stepped:false, email:null, secret:null, accountId:null, subject:null, items:[], view:'home' };
 const $ = id => document.getElementById(id);
 const esc = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 function toast(m,err){ const t=$('toast'); t.textContent=m; t.className='toast show'+(err?' err':''); clearTimeout(t._x); t._x=setTimeout(()=>t.className='toast',2800); }
@@ -200,8 +200,8 @@ async function api(method, path, body){
 }
 
 /* ---------- auth ---------- */
-$('btnLogin').onclick = async()=>{ try{ const r=await api('POST','/api/auth/login',{email:$('email').value,secret:$('secret').value}); await onSignedIn(r); }catch(e){ toast(e.message,true);} };
-$('btnRegister').onclick = async()=>{ try{ await api('POST','/api/auth/register',{email:$('email').value,secret:$('secret').value}); const r=await api('POST','/api/auth/login',{email:$('email').value,secret:$('secret').value}); await onSignedIn(r); toast('Welcome to MediKey'); }catch(e){ toast(e.message,true);} };
+$('btnLogin').onclick = async()=>{ try{ const sec=$('secret').value; const r=await api('POST','/api/auth/login',{email:$('email').value,secret:sec}); S.secret=sec; await onSignedIn(r); }catch(e){ toast(e.message,true);} };
+$('btnRegister').onclick = async()=>{ try{ const sec=$('secret').value; await api('POST','/api/auth/register',{email:$('email').value,secret:sec}); const r=await api('POST','/api/auth/login',{email:$('email').value,secret:sec}); S.secret=sec; await onSignedIn(r); toast('Welcome to MediKey'); }catch(e){ toast(e.message,true);} };
 function waOK(){ return window.PublicKeyCredential && PublicKeyCredential.parseRequestOptionsFromJSON; }
 $('btnPasskeyLogin').onclick = async()=>{
   if(!waOK()) return toast('This browser lacks passkey support',true);
@@ -231,12 +231,14 @@ function refreshChrome(){
 }
 
 /* ---------- step-up (hidden complexity) ---------- */
-function ensureStepUp(){
+async function ensureStepUp(){
+  if(S.stepped) return true;
+  // Frictionless: reuse the passphrase from sign-in to authorize silently.
+  if(S.secret){ try{ const r=await api('POST','/api/auth/stepup',{secret:S.secret}); S.token=r.token; S.stepped=true; return true; }catch(e){/* fall back to prompt */} }
   return new Promise((resolve)=>{
-    if(S.stepped) return resolve(true);
     openModal(\`<div class="m-h"><h3>Confirm it's you</h3><p>For your security, sensitive changes need a quick confirmation.</p></div>
       <div class="m-b">
-        <label class="fld">Passphrase</label><input id="suSecret" type="password" autocomplete="current-password">
+        <label class="fld">Passphrase</label><input id="suSecret" type="password" autocomplete="current-password" value="\${esc(S.secret||'')}">
         <button id="suGo" class="btn block" style="margin-top:14px">Confirm</button>
         <button id="suPk" class="btn ghost block" style="margin-top:8px">🔑 Use passkey instead</button>
       </div>\`);
@@ -533,7 +535,7 @@ function renderSettings(){
    <div class="card" style="margin-top:16px;border-color:var(--danger)"><div class="pad"><h3 style="color:var(--danger)">Danger zone</h3></div>
      <div class="rowitem"><div class="grow"><h4 style="font-weight:600">Delete my MediKey</h4><p>Permanently erase your identity and medical data (crypto-shred)</p></div><button class="btn danger sm" onclick="deleteAccount()">Delete</button></div></div>\`;
 }
-function signOut(){ Object.assign(S,{token:null,stepped:false,subject:null,items:[]}); $('app').classList.add('hidden'); $('auth').classList.remove('hidden'); toast('Signed out'); }
+function signOut(){ Object.assign(S,{token:null,stepped:false,secret:null,subject:null,items:[]}); $('app').classList.add('hidden'); $('auth').classList.remove('hidden'); toast('Signed out'); }
 async function addPasskey(){ if(!(window.PublicKeyCredential&&PublicKeyCredential.parseCreationOptionsFromJSON)) return toast('No passkey support',true);
   try{ const o=await api('POST','/api/auth/passkey/register/options',{}); const c=await navigator.credentials.create({publicKey:PublicKeyCredential.parseCreationOptionsFromJSON(o)}); await api('POST','/api/auth/passkey/register/verify',c.toJSON()); toast('Passkey added ✓'); }catch(e){toast(e.message||'cancelled',true);} }
 async function exportData(){ if(!await ensureStepUp())return; try{ const d=await api('POST','/api/export'); const b=new Blob([JSON.stringify(d,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='medikey-export.json'; a.click(); toast('Exported'); }catch(e){toast(e.message,true);} }

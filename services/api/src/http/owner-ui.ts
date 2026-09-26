@@ -216,6 +216,7 @@ async function api(method, path, body){
   const h={}; if(body!==undefined) h['content-type']='application/json'; if(S.token) h.authorization='Bearer '+S.token;
   const r=await fetch(path,{method,headers:h,body:body!==undefined?JSON.stringify(body):undefined});
   const txt=await r.text(); let d={}; try{ d=txt?JSON.parse(txt):{}; }catch{ d={_text:txt}; }
+  if(r.status===401){ signOut(); throw new Error('Session expired — please sign in again'); }
   if(!r.ok){ const e=new Error(d.message||d.error||('HTTP '+r.status)); e.status=r.status; throw e; }
   return d;
 }

@@ -129,11 +129,14 @@ export function buildRouter(app: App) {
 
   // ---- Auth ----
   add("POST", "/api/auth/register", "none", async ({ res, body }) => {
-    const b = (body ?? {}) as { email?: string; secret?: string; preferredLanguage?: string };
+    const b = (body ?? {}) as { email?: string; secret?: string; preferredLanguage?: string; role?: "patient" | "provider"; providerName?: string; providerOrg?: string };
     const out = await app.auth.register({
       email: String(b.email ?? ""),
       secret: String(b.secret ?? ""),
       preferredLanguage: b.preferredLanguage,
+      role: b.role,
+      providerName: b.providerName,
+      providerOrg: b.providerOrg,
     });
     json(res, 201, out);
   });

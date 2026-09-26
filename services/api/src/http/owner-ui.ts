@@ -164,14 +164,14 @@ nav.bottom{display:none}
   <div class="card pad" style="width:100%;max-width:380px">
     <div style="display:flex;align-items:center;gap:11px;margin-bottom:6px"><span class="logo">M</span><b style="font-size:19px">MediKey</b></div>
     <p class="muted" style="margin:0 0 14px">Your secure medical identity.</p>
-    <label class="fld">Email</label><input id="email" placeholder="you@example.com" value="sanjith@example.com">
-    <label class="fld">Passphrase <span class="faint">— any length</span></label><input id="secret" type="password" value="1234">
-    <button id="btnLogin" class="btn block" style="margin-top:16px">Sign in</button>
+    <label class="fld">Email</label><input id="email" placeholder="you@example.com">
+    <label class="fld">Passphrase <span class="faint">— any length</span></label><input id="secret" type="password" placeholder="choose anything">
+    <button id="btnRegister" class="btn block" style="margin-top:16px">Create account</button>
     <div class="row" style="margin-top:10px">
+      <button id="btnLogin" class="btn ghost">Sign in</button>
       <button id="btnPasskeyLogin" class="btn ghost">🔑 Passkey</button>
-      <button id="btnRegister" class="btn ghost">Create account</button>
     </div>
-    <p class="faint small" style="text-align:center;margin:14px 0 0">Demo uses synthetic data only.</p>
+    <p class="faint small" style="text-align:center;margin:14px 0 0">Demo uses synthetic data only. Data resets on server restart.</p>
   </div>
 </div>
 
@@ -224,7 +224,7 @@ async function api(method, path, body){
 }
 
 /* ---------- auth ---------- */
-$('btnLogin').onclick = async()=>{ try{ const sec=$('secret').value; const r=await api('POST','/api/auth/login',{email:$('email').value,secret:sec}); S.secret=sec; await onSignedIn(r); }catch(e){ toast(e.message,true);} };
+$('btnLogin').onclick = async()=>{ try{ const sec=$('secret').value; const r=await api('POST','/api/auth/login',{email:$('email').value,secret:sec}); S.secret=sec; await onSignedIn(r); }catch(e){ toast(e.status===401?'Wrong email or passphrase — or create an account first':e.message,true);} };
 $('btnRegister').onclick = async()=>{ try{ const sec=$('secret').value; await api('POST','/api/auth/register',{email:$('email').value,secret:sec}); const r=await api('POST','/api/auth/login',{email:$('email').value,secret:sec}); S.secret=sec; await onSignedIn(r); toast('Welcome to MediKey'); }catch(e){ toast(e.message,true);} };
 function waOK(){ return window.PublicKeyCredential && PublicKeyCredential.parseRequestOptionsFromJSON; }
 $('btnPasskeyLogin').onclick = async()=>{

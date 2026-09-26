@@ -238,7 +238,23 @@ $('btnPasskeyLogin').onclick = async()=>{
 async function onSignedIn(r){
   S.token=r.token; S.accountId=r.accountId; S.stepped=(r.authStrength==='stepped_up'); S.email=$('email').value;
   $('auth').classList.add('hidden'); $('app').classList.remove('hidden');
-  await loadSubject(); go('home');
+  await loadSubject();
+  if(!S.subject) await seedDemoProfile();
+  go('home');
+}
+async function seedDemoProfile(){
+  try{
+    const sec=S.secret||$('secret').value;
+    if(!S.stepped&&sec){ try{ const u=await api('POST','/api/auth/stepup',{secret:sec}); S.token=u.token; S.stepped=true; }catch{} }
+    const s=await api('POST','/api/subjects',{fullName:'Sanjith M',dateOfBirth:'2002-06-15',extras:{gender:'Male'}});
+    const sid=s.subjectId;
+    await api('POST','/api/subjects/'+sid+'/items',{type:'blood_group',data:{group:'O+'},provenance:'user_confirmed'});
+    await api('POST','/api/subjects/'+sid+'/items',{type:'allergy',data:{name:'Penicillin',reaction:'Anaphylaxis'},isCritical:true});
+    await api('POST','/api/subjects/'+sid+'/items',{type:'medication',data:{name:'Metformin',dose:'500mg',frequency:'Twice daily'}});
+    await api('POST','/api/subjects/'+sid+'/items',{type:'condition',data:{name:'Type-2 Diabetes'}});
+    await api('POST','/api/subjects/'+sid+'/items',{type:'emergency_contact',data:{name:'Priya M',relationship:'Sister',phone:'+91 98765 43210'},isCritical:true});
+    await loadSubject();
+  }catch(e){ console.warn('seed failed',e); }
 }
 async function loadSubject(){
   const subs=await api('GET','/api/subjects');

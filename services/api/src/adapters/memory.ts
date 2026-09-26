@@ -11,6 +11,7 @@ import type {
   AccessLog,
   SecurityEvent,
   Consent,
+  ConsentGrant,
 } from "../domain/model";
 import type { Repository, AuditSink, Cache, RateLimiter, Notifier } from "./ports";
 
@@ -29,6 +30,7 @@ export class MemoryRepository implements Repository {
   private tokens = new Map<string, AccessToken>();
   private logs: AccessLog[] = [];
   private consents: Consent[] = [];
+  private consentGrants = new Map<string, ConsentGrant>();
 
   async createAccount(a: Account) { this.accounts.set(a.id, clone(a)); }
   async getAccountById(id: string) { const a = this.accounts.get(id); return a && clone(a); }
@@ -127,6 +129,16 @@ export class MemoryRepository implements Repository {
   async listConsentsByAccount(accountId: string) {
     return this.consents.filter((c) => c.accountId === accountId).map(clone);
   }
+
+  async createConsentGrant(g: ConsentGrant) { this.consentGrants.set(g.id, clone(g)); }
+  async getConsentGrant(id: string) { const g = this.consentGrants.get(id); return g && clone(g); }
+  async listConsentGrantsBySubject(subjectId: string) {
+    return [...this.consentGrants.values()].filter((g) => g.subjectId === subjectId).map(clone);
+  }
+  async listConsentGrantsByProvider(providerAccountId: string) {
+    return [...this.consentGrants.values()].filter((g) => g.providerAccountId === providerAccountId).map(clone);
+  }
+  async updateConsentGrant(g: ConsentGrant) { this.consentGrants.set(g.id, clone(g)); }
 }
 
 /** Append-only in-memory audit sink. No update/delete surface exists. */

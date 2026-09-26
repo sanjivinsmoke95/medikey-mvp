@@ -2,11 +2,13 @@ import type {
   EncryptedField,
   DisclosureTier,
   Provenance,
+  VerificationStatus,
 } from "@medikey/core";
 
 /** Domain entities. Sensitive values are stored ONLY as EncryptedField (🔒). */
 
 export type AccountStatus = "active" | "suspended" | "pending_deletion" | "deleted";
+export type AccountRole = "patient" | "provider";
 
 export interface Account {
   id: string;
@@ -15,9 +17,13 @@ export interface Account {
   phoneEnc?: EncryptedField;
   phoneVerifiedAt?: string;
   status: AccountStatus;
+  role: AccountRole;
   preferredLanguage: string;
   /** G6: access-location logging is per-owner opt-in, default false. */
   locationLoggingOptIn: boolean;
+  /** Provider-only fields */
+  providerName?: string;
+  providerOrg?: string;
   createdAt: string;
   deletedAt?: string;
 }
@@ -75,7 +81,11 @@ export type MedicalItemType =
   | "surgery"
   | "injury"
   | "emergency_contact"
-  | "document"; // X-rays / reports — image stored inside the encrypted data payload (L3-class)
+  | "document"
+  | "prescription"
+  | "vaccination"
+  | "procedure"
+  | "medical_history";
 
 export interface MedicalItem {
   id: string;
@@ -89,7 +99,12 @@ export interface MedicalItem {
   /** Stated-negative: an explicit "none known" positive assertion. */
   noneKnown?: boolean;
   noneKnownConfirmedAt?: string;
+  verificationStatus: VerificationStatus;
+  /** Provider who created/verified this record (account ID). */
+  providerId?: string;
+  providerNameSnapshot?: string;
   createdAt: string;
+  updatedAt?: string;
   lastConfirmedAt?: string;
 }
 
@@ -138,7 +153,7 @@ export interface AccessToken {
   createdAt: string;
 }
 
-export type AccessType = "anonymous" | "break_glass" | "contact_approved" | "professional" | "owner";
+export type AccessType = "anonymous" | "break_glass" | "contact_approved" | "professional" | "owner" | "provider_consent";
 export type AccessLevel = "l1" | "l2";
 export type AccessStatus = "shown" | "revoked" | "not_found" | "rate_limited" | "denied";
 
@@ -152,6 +167,33 @@ export interface AccessLog {
   uaFamily?: string;
   /** Only present if the owner opted in (G6). Coarse, IP-truncated. */
   city?: string;
+  /** Provider/org name for provider_consent access */
+  providerName?: string;
+  createdAt: string;
+}
+
+/** Provider consent grant — the core of the clinical access workflow. */
+export type ConsentStatus = "pending" | "granted" | "declined" | "revoked" | "expired";
+
+export interface ConsentGrant {
+  id: string;
+  subjectId: string;
+  patientAccountId: string;
+  providerAccountId: string;
+  providerName: string;
+  providerOrg?: string;
+  /** Which medical categories were requested */
+  requestedCategories: MedicalItemType[];
+  /** Which categories the patient actually approved (subset of requested) */
+  approvedCategories?: MedicalItemType[];
+  purpose: string;
+  status: ConsentStatus;
+  /** Duration in seconds from grant time */
+  durationSeconds: number;
+  grantedAt?: string;
+  expiresAt?: string;
+  revokedAt?: string;
+  declinedAt?: string;
   createdAt: string;
 }
 

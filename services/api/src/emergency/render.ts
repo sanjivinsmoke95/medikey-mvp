@@ -102,6 +102,7 @@ function renderField(f: DisclosureField): string {
 function provenanceLabel(p: string): string {
   switch (p) {
     case "verified": return "verified";
+    case "provider_verified": return "provider-verified";
     case "user_confirmed": return "user-confirmed";
     default: return "user-provided";
   }
@@ -147,12 +148,18 @@ export function renderEmergencyPage(opts: RenderOptions): string {
     ? `<p>Last confirmed: ${escapeHtml(opts.lastConfirmed)}</p>`
     : "";
   const moreInfo = `<p><a href="?more=1">More information</a> (logged; the owner is notified)</p>`;
+  const clinicalBox = `<div style="margin:16px 0;padding:14px 16px;border:2px solid #e67e22;border-radius:10px;background:#fef3e2">
+    <div style="font-weight:700;font-size:15px;color:#b45309">🟠 Clinical Information</div>
+    <p style="margin:6px 0;font-size:14px;color:#92400e">Full medical history, prescriptions, and conditions require patient consent.</p>
+    <p style="margin:6px 0;font-size:13px;color:#78350f">If you are a healthcare provider, scan this code from the <b>MediKey Provider Console</b> to request consent-based clinical access.</p>
+  </div>`;
 
   return shell(
     lang,
     `<h1>Emergency Medical Information</h1>
      ${staleBanner}
      ${rows}
+     ${clinicalBox}
      ${moreInfo}
      ${lastConfirmed}
      <footer>${escapeHtml(FOOTER)}</footer>`,

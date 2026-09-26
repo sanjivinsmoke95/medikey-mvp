@@ -7,6 +7,7 @@ import { AppError, AuthError } from "../app/errors";
 import { renderEmergencyPage } from "../emergency/render";
 import { OWNER_UI_HTML } from "./owner-ui";
 import { SITE_HTML } from "./site";
+import { PROVIDER_UI_HTML } from "./provider-ui";
 
 /**
  * HTTP layer (P11) — wires the frozen service layer behind a zero-dependency
@@ -222,6 +223,7 @@ export function buildRouter(app: App) {
       isCritical?: boolean;
       severity?: string;
       provenance?: string;
+      verificationStatus?: string;
     };
     const out = await app.medical.addItem(principal!, params.id!, {
       type: b.type as never,
@@ -229,6 +231,7 @@ export function buildRouter(app: App) {
       isCritical: b.isCritical,
       severity: b.severity,
       provenance: b.provenance as never,
+      verificationStatus: b.verificationStatus as never,
     });
     json(res, 201, out);
   });
@@ -289,6 +292,69 @@ export function buildRouter(app: App) {
     json(res, 200, { ok: true });
   });
 
+  // ---- Consent (provider access) ----
+  add("POST", "/api/consent/request", "primary", async ({ res, principal, body }) => {
+    const b = (body ?? {}) as { subjectId?: string; categories?: string[]; purpose?: string; durationSeconds?: number };
+    const out = await app.consent.requestConsent(principal!, {
+      subjectId: String(b.subjectId ?? ""),
+      categories: (b.categories ?? []) as never[],
+      purpose: String(b.purpose ?? ""),
+      durationSeconds: b.durationSeconds,
+    });
+    json(res, 201, out);
+  });
+
+  add("POST", "/api/consent/:id/grant", "primary", async ({ res, principal, params, body }) => {
+    const b = (body ?? {}) as { approvedCategories?: string[] };
+    json(res, 200, await app.consent.grantConsent(principal!, params.id!, b.approvedCategories as never[]));
+  });
+
+  add("POST", "/api/consent/:id/decline", "primary", async ({ res, principal, params }) => {
+    json(res, 200, await app.consent.declineConsent(principal!, params.id!));
+  });
+
+  add("POST", "/api/consent/:id/revoke", "primary", async ({ res, principal, params }) => {
+    json(res, 200, await app.consent.revokeConsent(principal!, params.id!));
+  });
+
+  add("GET", "/api/subjects/:id/consent-grants", "primary", async ({ res, principal, params }) => {
+    json(res, 200, await app.consent.listPatientGrants(principal!, params.id!));
+  });
+
+  add("GET", "/api/provider/grants", "primary", async ({ res, principal }) => {
+    json(res, 200, await app.consent.listProviderGrants(principal!));
+  });
+
+  add("GET", "/api/consent/:id/data", "primary", async ({ res, principal, params }) => {
+    json(res, 200, await app.consent.readConsentedData(principal!, params.id!));
+  });
+
+  add("POST", "/api/consent/:id/add-record", "primary", async ({ res, principal, params, body }) => {
+    const grant = await app.ctx.repo.getConsentGrant(params.id!);
+    if (!grant || grant.providerAccountId !== principal!.accountId || grant.status !== "granted") {
+      json(res, 404, { error: "not_found" }); return;
+    }
+    if (grant.expiresAt && Date.parse(grant.expiresAt) < Date.now()) {
+      json(res, 403, { error: "consent_expired" }); return;
+    }
+    const acc = await app.ctx.repo.getAccountById(principal!.accountId);
+    const b = (body ?? {}) as { type?: string; data?: Record<string, unknown>; isCritical?: boolean; severity?: string };
+    const out = await app.medical.addProviderItem(
+      grant.subjectId,
+      principal!.accountId,
+      acc?.providerName ?? acc?.email ?? "Provider",
+      { type: b.type as never, data: b.data ?? {}, isCritical: b.isCritical, severity: b.severity },
+    );
+    json(res, 201, out);
+  });
+
+  add("POST", "/api/provider/resolve-qr", "primary", async ({ res, body }) => {
+    const b = (body ?? {}) as { opaqueId?: string };
+    const result = await app.consent.resolveSubjectForProvider(String(b.opaqueId ?? ""));
+    if (!result) { json(res, 404, { error: "not_found" }); return; }
+    json(res, 200, result);
+  });
+
   // ---- Rights ----
   add("GET", "/api/subjects/:id/history", "primary", async ({ res, principal, params }) => {
     json(res, 200, await app.rights.accessHistory(principal!, params.id!));
@@ -308,10 +374,21 @@ export function buildRouter(app: App) {
     json(res, 200, { ok: true });
   });
 
-  // ---- Public site + owner console (static pages) ----
-  add("GET", "/", "none", ({ res }) => html(res, 200, SITE_HTML));           // full marketing website
-  add("GET", "/console", "none", ({ res }) => html(res, 200, OWNER_UI_HTML)); // functional owner console
+  // ---- Public site + consoles (static pages) ----
+  add("GET", "/", "none", ({ res }) => html(res, 200, SITE_HTML));
+  add("GET", "/console", "none", ({ res }) => html(res, 200, OWNER_UI_HTML));
+  add("GET", "/provider", "none", ({ res }) => html(res, 200, PROVIDER_UI_HTML));
   add("GET", "/health", "none", ({ res }) => json(res, 200, { ok: true }));
+
+  // Auth: expose account role + info via /me
+  add("GET", "/api/auth/account", "primary", async ({ res, principal }) => {
+    const acc = await app.ctx.repo.getAccountById(principal!.accountId);
+    if (!acc) { json(res, 404, { error: "not_found" }); return; }
+    json(res, 200, {
+      accountId: acc.id, email: acc.email, role: acc.role,
+      providerName: acc.providerName, providerOrg: acc.providerOrg,
+    });
+  });
 
   function match(method: string, path: string): { route: Route; params: Record<string, string> } | undefined {
     const parts = path.split("/").filter(Boolean);

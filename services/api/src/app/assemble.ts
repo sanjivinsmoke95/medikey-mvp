@@ -7,6 +7,7 @@ import { QrService } from "../qr/service";
 import { ScannerService } from "../scanner/service";
 import { BreakGlassService } from "../breakglass/service";
 import { RightsService } from "../rights/service";
+import { ConsentService } from "../consent/service";
 
 /** Composition root: wires all services + the rebuild hook. */
 export interface App {
@@ -19,6 +20,7 @@ export interface App {
   scanner: ScannerService;
   breakGlass: BreakGlassService;
   rights: RightsService;
+  consent: ConsentService;
 }
 
 export function assembleApp(ctx: AppContext): App {
@@ -30,11 +32,11 @@ export function assembleApp(ctx: AppContext): App {
   const scanner = new ScannerService(ctx, qr, disclosure);
   const breakGlass = new BreakGlassService(ctx, qr, disclosure);
   const rights = new RightsService(ctx);
+  const consent = new ConsentService(ctx, medical);
 
-  // Rebuild the emergency_view whenever medical data changes.
   medical.onChange((subjectId) => disclosure.buildAndCacheView(subjectId));
 
-  return { ctx, auth, profile, medical, disclosure, qr, scanner, breakGlass, rights };
+  return { ctx, auth, profile, medical, disclosure, qr, scanner, breakGlass, rights, consent };
 }
 
 export function createApp(source: Record<string, string | undefined> = process.env): App {

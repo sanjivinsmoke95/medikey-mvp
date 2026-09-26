@@ -16,6 +16,7 @@ export {
   type Provenance,
   type DisclosureTier,
   type DisclosureLevel,
+  type VerificationStatus,
 } from "./disclosure/tiers";
 
 export {

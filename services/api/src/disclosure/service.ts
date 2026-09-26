@@ -31,7 +31,11 @@ const SECTION_BY_TYPE: Record<MedicalItemType, EmergencySection> = {
   surgery: "surgery",
   injury: "injury",
   emergency_contact: "contact",
-  document: "document", // L3-class (never scanner-reachable)
+  document: "document",
+  prescription: "medication",
+  vaccination: "condition",
+  procedure: "surgery",
+  medical_history: "condition",
 };
 
 const LABEL: Record<EmergencySection, string> = {
@@ -208,6 +212,14 @@ export class DisclosureService {
         return data.reaction ? `${name} — ${data.reaction as string}` : name;
       case "document":
         return String(data.title ?? data.name ?? "Document");
+      case "prescription":
+        return data.drug ? `${data.drug as string}${data.dose ? ` (${data.dose as string})` : ""}` : name;
+      case "vaccination":
+        return data.vaccine ? `${data.vaccine as string}${data.date ? ` — ${data.date as string}` : ""}` : name;
+      case "procedure":
+        return name;
+      case "medical_history":
+        return name;
       default:
         return name;
     }

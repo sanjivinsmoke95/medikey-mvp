@@ -1,4 +1,4 @@
-import { newId, assertOwns, type Principal, type Provenance } from "@medikey/core";
+import { newId, assertOwns, type Principal, type Provenance, type VerificationStatus } from "@medikey/core";
 import type { AppContext } from "../app/context";
 import { NotFoundError, ValidationError } from "../app/errors";
 import type { MedicalItem, MedicalItemType, SubjectProfile } from "../domain/model";
@@ -10,6 +10,9 @@ export interface AddItemInput {
   provenance?: Provenance;
   isCritical?: boolean;
   severity?: string;
+  verificationStatus?: VerificationStatus;
+  providerId?: string;
+  providerNameSnapshot?: string;
 }
 
 export interface MedicalItemView {
@@ -21,11 +24,17 @@ export interface MedicalItemView {
   severity?: string;
   noneKnown: boolean;
   noneKnownConfirmedAt?: string;
+  verificationStatus: VerificationStatus;
+  providerId?: string;
+  providerNameSnapshot?: string;
+  createdAt: string;
+  updatedAt?: string;
 }
 
 const ITEM_TYPES = new Set<MedicalItemType>([
   "blood_group", "allergy", "condition", "medication", "medication_avoidance",
   "implant", "surgery", "injury", "emergency_contact", "document",
+  "prescription", "vaccination", "procedure", "medical_history",
 ]);
 
 /**
@@ -67,10 +76,13 @@ export class MedicalService {
       subjectId,
       type: input.type,
       dataEnc: await this.ctx.envelope.encryptField(subjectId, JSON.stringify(input.data)),
-      provenance: input.provenance ?? "user_provided", // provenance-or-fail: always set
+      provenance: input.provenance ?? "user_provided",
       isCritical: input.isCritical ?? false,
       severity: input.severity,
       noneKnown: false,
+      verificationStatus: input.verificationStatus ?? "self_reported",
+      providerId: input.providerId,
+      providerNameSnapshot: input.providerNameSnapshot,
       createdAt: this.ctx.now(),
       lastConfirmedAt: this.ctx.now(),
     };
@@ -78,6 +90,40 @@ export class MedicalService {
     await this.ctx.audit.append({
       id: newId(), type: "medical_item_added", accountId: principal.accountId, subjectId,
       detail: { itemType: input.type }, severity: "info", createdAt: this.ctx.now(),
+    });
+    await this.rebuild(subjectId);
+    return { itemId: id };
+  }
+
+  /** Provider adds a record to a patient's subject (requires consent grant). */
+  async addProviderItem(
+    subjectId: string,
+    providerId: string,
+    providerName: string,
+    input: AddItemInput,
+  ): Promise<{ itemId: string }> {
+    if (!ITEM_TYPES.has(input.type)) throw new ValidationError("unknown item type");
+    if (!input.data || typeof input.data !== "object") throw new ValidationError("data required");
+    const id = newId();
+    const item: MedicalItem = {
+      id,
+      subjectId,
+      type: input.type,
+      dataEnc: await this.ctx.envelope.encryptField(subjectId, JSON.stringify(input.data)),
+      provenance: "provider_verified",
+      isCritical: input.isCritical ?? false,
+      severity: input.severity,
+      noneKnown: false,
+      verificationStatus: "provider_verified",
+      providerId,
+      providerNameSnapshot: providerName,
+      createdAt: this.ctx.now(),
+      lastConfirmedAt: this.ctx.now(),
+    };
+    await this.ctx.repo.addItem(item);
+    await this.ctx.audit.append({
+      id: newId(), type: "provider_item_added", subjectId,
+      detail: { itemType: input.type, providerId }, severity: "info", createdAt: this.ctx.now(),
     });
     await this.rebuild(subjectId);
     return { itemId: id };
@@ -95,6 +141,7 @@ export class MedicalService {
       isCritical: false,
       noneKnown: true,
       noneKnownConfirmedAt: this.ctx.now(),
+      verificationStatus: "self_reported",
       createdAt: this.ctx.now(),
     };
     await this.ctx.repo.addItem(item);
@@ -127,6 +174,13 @@ export class MedicalService {
     await this.rebuild(item.subjectId);
   }
 
+  /** List items by type for a subject (no ownership check — used by consent service). */
+  async listItemsBySubjectAndTypes(subjectId: string, types: Set<string>): Promise<MedicalItemView[]> {
+    const items = await this.ctx.repo.listItemsBySubject(subjectId);
+    const filtered = items.filter((i) => types.has(i.type));
+    return Promise.all(filtered.map((i) => this.toView(i)));
+  }
+
   private async toView(i: MedicalItem): Promise<MedicalItemView> {
     return {
       id: i.id,
@@ -137,6 +191,11 @@ export class MedicalService {
       severity: i.severity,
       noneKnown: i.noneKnown ?? false,
       noneKnownConfirmedAt: i.noneKnownConfirmedAt,
+      verificationStatus: i.verificationStatus ?? "self_reported",
+      providerId: i.providerId,
+      providerNameSnapshot: i.providerNameSnapshot,
+      createdAt: i.createdAt,
+      updatedAt: i.updatedAt,
     };
   }
 }

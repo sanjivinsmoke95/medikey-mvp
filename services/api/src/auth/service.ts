@@ -12,14 +12,20 @@ const NOTICE_VERSION = "2026-08-31";
 
 export interface RegisterInput {
   email: string;
-  secret: string; // dev credential (stands in for passkey enrolment)
+  secret: string;
   preferredLanguage?: string;
+  role?: "patient" | "provider";
+  providerName?: string;
+  providerOrg?: string;
 }
 
 export interface SessionResult {
-  token: string; // returned once; only the hash is stored
+  token: string;
   accountId: string;
   authStrength: Session["authStrength"];
+  role: string;
+  providerName?: string;
+  providerOrg?: string;
   expiresAt: string;
 }
 
@@ -49,7 +55,13 @@ export class AuthService {
       createdAt: this.ctx.now(),
     };
     await this.ctx.repo.createSession(session);
-    return { token, accountId, authStrength: strength, expiresAt: session.expiresAt };
+    const acc = await this.ctx.repo.getAccountById(accountId);
+    return {
+      token, accountId, authStrength: strength, expiresAt: session.expiresAt,
+      role: acc?.role ?? "patient",
+      providerName: acc?.providerName,
+      providerOrg: acc?.providerOrg,
+    };
   }
 
   async register(input: RegisterInput): Promise<{ accountId: string }> {
@@ -62,8 +74,11 @@ export class AuthService {
       id: newId(),
       email,
       status: "active",
+      role: input.role ?? "patient",
       preferredLanguage: input.preferredLanguage ?? "en",
-      locationLoggingOptIn: false, // G6 default OFF
+      locationLoggingOptIn: false,
+      providerName: input.providerName,
+      providerOrg: input.providerOrg,
       createdAt: this.ctx.now(),
     };
     await this.ctx.repo.createAccount(account);

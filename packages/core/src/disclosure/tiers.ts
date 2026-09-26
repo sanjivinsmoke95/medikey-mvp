@@ -4,8 +4,16 @@ export const PROVENANCE = [
   "user_provided",
   "user_confirmed",
   "verified",
+  "provider_verified",
 ] as const;
 export type Provenance = (typeof PROVENANCE)[number];
+
+/** Verification status for medical records. */
+export type VerificationStatus =
+  | "self_reported"
+  | "provider_verified"
+  | "pending"
+  | "needs_review";
 
 /** The tier a field is assigned to in the disclosure allow-list. */
 export const DISCLOSURE_TIER = [

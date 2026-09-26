@@ -13,6 +13,7 @@ import {
 import type {
   Account, Credential, Session, SubjectProfile, MedicalItem, EmergencySelection,
   EmergencyView, QrIdentifier, AccessToken, AccessLog, SecurityEvent, Consent,
+  ConsentGrant, ConsentStatus,
   MedicalItemType, AccountStatus, AuthStrength, SubjectRelationship,
   QrStatus, QrActivationState, GrantType, AccessType, AccessLevel, AccessStatus,
 } from "../domain/model";
@@ -263,6 +264,37 @@ export class PostgresRepository implements Repository {
   async listConsentsByAccount(accountId: string) {
     return (await this.q(`SELECT * FROM consents WHERE account_id=$1 ORDER BY granted_at`, [accountId])).map(mapConsent);
   }
+
+  // ---- consent grants (provider access) ----
+  async createConsentGrant(g: ConsentGrant): Promise<void> {
+    await this.q(
+      `INSERT INTO consent_grants (id,subject_id,patient_account_id,provider_account_id,provider_name,provider_org,
+        requested_categories,approved_categories,purpose,status,duration_seconds,
+        granted_at,expires_at,revoked_at,declined_at,created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+      [g.id, g.subjectId, g.patientAccountId, g.providerAccountId, g.providerName, g.providerOrg ?? null,
+       JSON.stringify(g.requestedCategories), g.approvedCategories ? JSON.stringify(g.approvedCategories) : null,
+       g.purpose, g.status, g.durationSeconds,
+       g.grantedAt ?? null, g.expiresAt ?? null, g.revokedAt ?? null, g.declinedAt ?? null, g.createdAt],
+    );
+  }
+  async getConsentGrant(id: string): Promise<ConsentGrant | undefined> {
+    return mapConsentGrant((await this.q(`SELECT * FROM consent_grants WHERE id=$1`, [id]))[0]);
+  }
+  async listConsentGrantsBySubject(subjectId: string): Promise<ConsentGrant[]> {
+    return (await this.q(`SELECT * FROM consent_grants WHERE subject_id=$1 ORDER BY created_at DESC`, [subjectId])).map(mapConsentGrantReq);
+  }
+  async listConsentGrantsByProvider(providerAccountId: string): Promise<ConsentGrant[]> {
+    return (await this.q(`SELECT * FROM consent_grants WHERE provider_account_id=$1 ORDER BY created_at DESC`, [providerAccountId])).map(mapConsentGrantReq);
+  }
+  async updateConsentGrant(g: ConsentGrant): Promise<void> {
+    await this.q(
+      `UPDATE consent_grants SET status=$2, approved_categories=$3, granted_at=$4, expires_at=$5, revoked_at=$6, declined_at=$7
+       WHERE id=$1`,
+      [g.id, g.status, g.approvedCategories ? JSON.stringify(g.approvedCategories) : null,
+       g.grantedAt ?? null, g.expiresAt ?? null, g.revokedAt ?? null, g.declinedAt ?? null],
+    );
+  }
 }
 
 /** Append-only audit sink → security_events. INSERT + SELECT only (no update/delete). */
@@ -356,7 +388,9 @@ function mapAccount(r?: Row): Account | undefined {
   return {
     id: r.id, email: r.email, emailVerifiedAt: iso(r.email_verified_at), phoneEnc: decField(r.phone_enc),
     phoneVerifiedAt: iso(r.phone_verified_at), status: r.status as AccountStatus,
+    role: (r.role as Account["role"]) ?? "patient",
     preferredLanguage: r.preferred_language, locationLoggingOptIn: r.location_logging_opt_in,
+    providerName: r.provider_name ?? undefined, providerOrg: r.provider_org ?? undefined,
     createdAt: isoReq(r.created_at), deletedAt: iso(r.deleted_at),
   };
 }
@@ -387,7 +421,10 @@ function mapItem(r?: Row): MedicalItem | undefined {
     id: r.id, subjectId: r.subject_id, type: r.type as MedicalItemType, dataEnc: decField(r.data_enc)!,
     provenance: r.provenance as Provenance, isCritical: r.is_critical, severity: r.severity ?? undefined,
     noneKnown: r.none_known, noneKnownConfirmedAt: iso(r.none_known_confirmed_at),
+    verificationStatus: r.verification_status ?? "self_reported",
+    providerId: r.provider_id ?? undefined, providerNameSnapshot: r.provider_name_snapshot ?? undefined,
     createdAt: isoReq(r.created_at), lastConfirmedAt: iso(r.last_confirmed_at),
+    updatedAt: iso(r.updated_at),
   };
 }
 const mapItemReq = (r: Row) => mapItem(r)!;
@@ -414,3 +451,18 @@ const mapConsent = (r: Row): Consent => ({
   id: r.id, accountId: r.account_id, subjectId: r.subject_id ?? undefined, purpose: r.purpose,
   noticeVersion: r.notice_version, grantedAt: isoReq(r.granted_at), withdrawnAt: iso(r.withdrawn_at),
 });
+function mapConsentGrant(r?: Row): ConsentGrant | undefined {
+  if (!r) return undefined;
+  return {
+    id: r.id, subjectId: r.subject_id, patientAccountId: r.patient_account_id,
+    providerAccountId: r.provider_account_id, providerName: r.provider_name,
+    providerOrg: r.provider_org ?? undefined,
+    requestedCategories: typeof r.requested_categories === "string" ? JSON.parse(r.requested_categories) : r.requested_categories,
+    approvedCategories: r.approved_categories ? (typeof r.approved_categories === "string" ? JSON.parse(r.approved_categories) : r.approved_categories) : undefined,
+    purpose: r.purpose, status: r.status as ConsentStatus, durationSeconds: r.duration_seconds,
+    grantedAt: iso(r.granted_at), expiresAt: iso(r.expires_at),
+    revokedAt: iso(r.revoked_at), declinedAt: iso(r.declined_at),
+    createdAt: isoReq(r.created_at),
+  };
+}
+const mapConsentGrantReq = (r: Row) => mapConsentGrant(r)!;

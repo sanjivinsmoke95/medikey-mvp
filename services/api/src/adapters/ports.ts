@@ -11,6 +11,7 @@ import type {
   AccessLog,
   SecurityEvent,
   Consent,
+  ConsentGrant,
 } from "../domain/model";
 
 /**
@@ -85,6 +86,13 @@ export interface Repository {
   // consents
   addConsent(c: Consent): Promise<void>;
   listConsentsByAccount(accountId: string): Promise<Consent[]>;
+
+  // consent grants (provider access)
+  createConsentGrant(g: ConsentGrant): Promise<void>;
+  getConsentGrant(id: string): Promise<ConsentGrant | undefined>;
+  listConsentGrantsBySubject(subjectId: string): Promise<ConsentGrant[]>;
+  listConsentGrantsByProvider(providerAccountId: string): Promise<ConsentGrant[]>;
+  updateConsentGrant(g: ConsentGrant): Promise<void>;
 }
 
 /**

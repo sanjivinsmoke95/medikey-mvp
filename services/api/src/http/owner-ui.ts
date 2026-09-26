@@ -69,6 +69,8 @@ nav.side a{display:flex;align-items:center;gap:11px;padding:10px 12px;border-rad
 nav.side a .i{width:20px;text-align:center}
 nav.side a:hover{background:var(--soft);color:var(--ink)}
 nav.side a.on{background:var(--soft);color:var(--navy);font-weight:650}
+nav.side a.disabled{opacity:.35;pointer-events:none}
+nav.bottom a.disabled{opacity:.35;pointer-events:none}
 nav.side .sep{height:1px;background:var(--line);margin:10px 6px}
 aside .foot{margin-top:auto;display:flex;align-items:center;gap:10px;padding:10px 8px;border-top:1px solid var(--line)}
 .avatar{width:34px;height:34px;border-radius:50%;background:var(--soft);display:grid;place-items:center;font-weight:700;color:var(--navy);overflow:hidden;flex:0 0 auto}
@@ -241,8 +243,9 @@ async function onSignedIn(r){
 async function loadSubject(){
   const subs=await api('GET','/api/subjects');
   S.subject = subs[0] || null;
-  if(S.subject){ S.items = await api('GET','/api/subjects/'+S.subject.id+'/items'); try{ S.grants=await api('GET','/api/subjects/'+S.subject.id+'/consent-grants'); }catch{ S.grants=[]; } refreshChrome(); }
+  if(S.subject){ S.items = await api('GET','/api/subjects/'+S.subject.id+'/items'); try{ S.grants=await api('GET','/api/subjects/'+S.subject.id+'/consent-grants'); }catch{ S.grants=[]; } }
   else { S.items=[]; S.grants=[]; }
+  refreshChrome();
 }
 function refreshChrome(){
   const name=S.subject? S.subject.fullName : '—';
@@ -250,6 +253,10 @@ function refreshChrome(){
   const photo=S.subject&&S.subject.extras&&S.subject.extras.photo;
   const initials=(name||'M').trim()[0]||'M';
   for(const el of [$('sideAv'),$('topAv')]) el.innerHTML = photo? '<img src="'+esc(photo)+'">' : esc(initials.toUpperCase());
+  document.querySelectorAll('[data-go]').forEach(a=>{
+    if(a.dataset.go==='home'||a.dataset.go==='settings') return;
+    a.classList.toggle('disabled',!S.subject);
+  });
 }
 
 /* ---------- step-up ---------- */
@@ -407,7 +414,9 @@ async function revokeGrant(id){
 }
 
 function renderOnboarding(){
+  const hint = S.view!=='home' ? '<div style="background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:12px 16px;margin-bottom:18px;font-size:14px;color:var(--muted)">Create your profile first to access <b style="color:var(--ink)">'+esc(S.view.charAt(0).toUpperCase()+S.view.slice(1))+'</b> and all other pages.</div>' : '';
   $('main').innerHTML=\`<h1 class="page-h">Welcome to MediKey</h1><p class="page-sub">Let's set up your medical identity.</p>
+    \${hint}
     <div class="card pad" style="max-width:460px">
       <label class="fld">Full name</label><input id="obName" placeholder="e.g. Sanjith M">
       <label class="fld">Date of birth</label><input id="obDob" type="date">

@@ -59,6 +59,22 @@ PORT=8788 bash scripts/dev.sh
 Data lives in memory and resets on restart (see persistent mode below). A rich
 Next.js PWA remains the documented next build; this server is the operator UI.
 
+## Share it (Cloudflare Quick Tunnel)
+
+Send anyone a public link with no deployment, account, or DNS:
+
+```bash
+brew install cloudflared     # one-time (macOS); see cloudflare docs otherwise
+pnpm run share               # or: bash scripts/share.sh
+```
+
+It starts the server (if not already up) and prints a public
+`https://<random>.trycloudflare.com` URL. Share that — the site is at `/`, the
+console at `/console`. Because the app builds the QR from the request's public
+origin, a QR generated while browsing the tunnel URL is scannable from a phone.
+The tunnel lives only while `share.sh` is running. For a durable URL, deploy
+behind managed Postgres/Redis (see `infra/`).
+
 ## Persistent mode (Postgres + Redis)
 
 Real adapters sit behind the same ports and are selected by environment:
